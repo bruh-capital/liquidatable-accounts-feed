@@ -15,6 +15,7 @@ use {
     solana_sdk::pubkey::Pubkey,
     std::collections::HashSet,
     std::fs::File,
+    std::path::Path,
     std::io::Read,
     std::str::FromStr,
 };
@@ -81,22 +82,16 @@ fn is_mango_cache<'a>(account: &'a AccountSharedData, program_id: &Pubkey) -> bo
     matches!(kind, DataType::MangoCache)
 }
 
+/// Loading the mango config
+pub fn load_config(mango_config_path: &String) -> anyhow::Result<MangoConfig> {
+    let mut file = File::open(mango_config_path)?; // Can change to whatever you like
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(toml::from_str::<MangoConfig>(&contents).unwrap())
+}
+
+/// Entrypoint thing
 pub async fn check_health(config: MangoConfig) -> anyhow::Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
-        println!("requires a config file argument");
-        return Ok(());
-    }
-
-    /* 
-    let config: MangoConfig = {
-        let mut file = File::open(&args[1])?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        toml::from_str(&contents).unwrap()
-    };
-    */
-
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
     let mango_group_id = Pubkey::from_str(&config.mango_group_id)?;
     let mango_cache_id = Pubkey::from_str(&config.mango_cache_id)?;
