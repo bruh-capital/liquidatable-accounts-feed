@@ -138,83 +138,84 @@ pub async fn check_health(config: MangoConfig) -> anyhow::Result<()> {
     // Is the first snapshot done? Only start checking account health when it is.
     let mut one_snapshot_done = false;
 
-    info!("main loop");
-    loop {
-        tokio::select! {
-            message = websocket_receiver.recv() => {
-                let message = message.expect("channel not closed");
+    tokio::spawn(async move { 
+        loop {
+            tokio::select! {
+                message = websocket_receiver.recv() => {
+                    let message = message.expect("channel not closed");
 
-                // build a model of slots and accounts in `chain_data`
-                // this code should be generic so it can be reused in future projects
-                chain_data.update_from_websocket(message.clone());
+                    // build a model of slots and accounts in `chain_data`
+                    // this code should be generic so it can be reused in future projects
+                    chain_data.update_from_websocket(message.clone());
 
-                // specific program logic using the mirrored data
-                match message {
-                    websocket_source::Message::Account(account_write) => {
-                        if let Some(_mango_account) = is_mango_account(&account_write.account, &mango_program_id, &mango_group_id) {
-                            // Track all MangoAccounts: we need to iterate over them later
-                            mango_accounts.insert(account_write.pubkey);
+                    // specific program logic using the mirrored data
+                    match message {
+                        websocket_source::Message::Account(account_write) => {
+                            if let Some(_mango_account) = is_mango_account(&account_write.account, &mango_program_id, &mango_group_id) {
+                                // Track all MangoAccounts: we need to iterate over them later
+                                mango_accounts.insert(account_write.pubkey);
 
-                            if !one_snapshot_done {
-                                continue;
+                                if !one_snapshot_done {
+                                    continue;
+                                }
+                                if let Err(err) = healthcheck::process_accounts(
+                                        &config,
+                                        &chain_data,
+                                        &mango_group_id,
+                                        &mango_cache_id,
+                                        std::iter::once(&account_write.pubkey),
+                                        &mut current_candidates,
+                                        &liquidation_candidate_sender,
+                                ) {
+                                    warn!("could not process account {}: {:?}", account_write.pubkey, err);
+                                }
                             }
-                            if let Err(err) = healthcheck::process_accounts(
-                                    &config,
-                                    &chain_data,
-                                    &mango_group_id,
-                                    &mango_cache_id,
-                                    std::iter::once(&account_write.pubkey),
-                                    &mut current_candidates,
-                                    &liquidation_candidate_sender,
-                            ) {
-                                warn!("could not process account {}: {:?}", account_write.pubkey, err);
+
+                            if account_write.pubkey == mango_cache_id && is_mango_cache(&account_write.account, &mango_program_id) {
+                                if !one_snapshot_done {
+                                    continue;
+                                }
+
+                                // check health of all accounts
+                                //
+                                // TODO: This could be done asynchronously by calling
+                                // let accounts = chain_data.accounts_snapshot();
+                                // and then working with the snapshot of the data
+                                //
+                                // However, this currently takes like 50ms for me in release builds,
+                                // so optimizing much seems unnecessary.
+                                if let Err(err) = healthcheck::process_accounts(
+                                        &config,
+                                        &chain_data,
+                                        &mango_group_id,
+                                        &mango_cache_id,
+                                        mango_accounts.iter(),
+                                        &mut current_candidates,
+                                        &liquidation_candidate_sender,
+                                ) {
+                                    warn!("could not process accounts: {:?}", err);
+                                }
                             }
                         }
+                        _ => {}
+                    }
+                },
+                message = snapshot_receiver.recv() => {
+                    let message = message.expect("channel not closed");
 
-                        if account_write.pubkey == mango_cache_id && is_mango_cache(&account_write.account, &mango_program_id) {
-                            if !one_snapshot_done {
-                                continue;
-                            }
-
-                            // check health of all accounts
-                            //
-                            // TODO: This could be done asynchronously by calling
-                            // let accounts = chain_data.accounts_snapshot();
-                            // and then working with the snapshot of the data
-                            //
-                            // However, this currently takes like 50ms for me in release builds,
-                            // so optimizing much seems unnecessary.
-                            if let Err(err) = healthcheck::process_accounts(
-                                    &config,
-                                    &chain_data,
-                                    &mango_group_id,
-                                    &mango_cache_id,
-                                    mango_accounts.iter(),
-                                    &mut current_candidates,
-                                    &liquidation_candidate_sender,
-                            ) {
-                                warn!("could not process accounts: {:?}", err);
-                            }
+                    // Track all mango account pubkeys
+                    for update in message.accounts.iter() {
+                        if let Some(_mango_account) = is_mango_account(&update.account, &mango_program_id, &mango_group_id) {
+                            mango_accounts.insert(update.pubkey);
                         }
                     }
-                    _ => {}
-                }
-            },
-            message = snapshot_receiver.recv() => {
-                let message = message.expect("channel not closed");
 
-                // Track all mango account pubkeys
-                for update in message.accounts.iter() {
-                    if let Some(_mango_account) = is_mango_account(&update.account, &mango_program_id, &mango_group_id) {
-                        mango_accounts.insert(update.pubkey);
-                    }
-                }
+                    chain_data.update_from_snapshot(message);
+                    one_snapshot_done = true;
 
-                chain_data.update_from_snapshot(message);
-                one_snapshot_done = true;
-
-                // TODO: trigger a full health check
-            },
+                    // TODO: trigger a full health check
+                },
+            }
         }
-    }
+    }).await?
 }
