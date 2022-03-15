@@ -12,7 +12,7 @@ use {
     fixed::types::I80F48,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct HealthInfo {
     pub account: Pubkey,
     pub being_liquidated: bool,
@@ -21,7 +21,7 @@ pub struct HealthInfo {
     pub liabilities: I80F48, // always maint
 }
 
-#[derive(Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum LiquidationCanditate {
     Start { info: HealthInfo },
     Now { info: HealthInfo },

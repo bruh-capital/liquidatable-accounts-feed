@@ -1,7 +1,10 @@
+use mango::queue::LiquidateEvent;
+
 use {
     crate::MangoConfig,
     crate::chain_data::ChainData,
     crate::websocket_sink::{LiquidationCanditate, HealthInfo},
+    rayon::prelude::*,
     anyhow::Context,
     fixed::types::I80F48,
     log::*,
@@ -13,6 +16,7 @@ use {
     solana_sdk::account::{AccountSharedData, ReadableAccount},
     solana_sdk::pubkey::Pubkey,
     std::collections::HashSet,
+    std::sync::RwLock,
     tokio::sync::broadcast,
 };
 
@@ -207,4 +211,79 @@ pub fn process_accounts<'a>(
     }
 
     Ok(())
+}
+
+/// Same thing as above just uses a channel instead of a ws
+pub fn process_accounts_chan<'a>(
+    config: &MangoConfig,
+    chain_data: &ChainData,
+    group_id: &Pubkey,
+    cache_id: &Pubkey,
+    accounts: HashSet<Pubkey>,
+    current_candidates: &mut HashSet<LiquidationCanditate>,
+    tx: &tokio::sync::watch::Sender<HashSet<Pubkey>>,
+) -> anyhow::Result<()> {
+    let group =
+        load_mango_account_from_chain::<MangoGroup>(DataType::MangoGroup, chain_data, group_id)
+            .context("loading group account")?;
+    let cache =
+        load_mango_account_from_chain::<MangoCache>(DataType::MangoCache, chain_data, cache_id)
+            .context("loading cache account")?;
+
+    // Put this thing in an RWLock so we can use rayon
+    let rwl_candiates = RwLock::new(current_candidates);
+
+    accounts.par_iter()
+        .for_each(|pubkey| {
+            let account_result = load_mango_account_from_chain::<MangoAccount>(
+                DataType::MangoAccount,
+                chain_data,
+                pubkey,
+            );
+
+            // This is pretty bad whoops...
+            // Basically no error handling so if something explodes it will 
+            // just break the whole function lol
+
+            let account = account_result
+                .unwrap();
+
+            let oos = get_open_orders(chain_data, group, account)
+                .unwrap();
+
+            let info = check_health(config, group, cache, account, &oos)
+                .unwrap();
+
+            let health_info = HealthInfo {
+                account: pubkey.clone(),
+                being_liquidated: info.being_liquidated,
+                health_fraction: info.health_fraction,
+                assets: info.assets,
+                liabilities: info.liabilities,
+            };
+
+            // FIXME(Milly): change this to a hashmap
+            let is_candidate = info.candidate;
+            let was_candidate = rwl_candiates
+                .read()
+                .unwrap()
+                .contains(pubkey);
+
+            if is_candidate && !was_candidate {
+                rwl_candiates
+                    .write()
+                    .unwrap()
+                    .insert(LiquidationCanditate::Start {
+                        info: health_info.clone(),
+                    });
+            }
+            if !is_candidate && was_candidate {
+                rwl_candiates
+                    .write()
+                    .unwrap()
+                    .remove(pubkey);
+            }
+        });
+
+    Ok(()) 
 }

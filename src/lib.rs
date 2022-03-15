@@ -7,6 +7,7 @@ pub mod websocket_source;
 
 use {
     crate::chain_data::*,
+    rayon::prelude::*,
     log::*,
     mango::state::{DataType, MangoAccount},
     mango_common::Loadable,
@@ -15,7 +16,6 @@ use {
     solana_sdk::pubkey::Pubkey,
     std::collections::HashSet,
     std::fs::File,
-    std::path::Path,
     std::io::Read,
     std::str::FromStr,
 };
@@ -91,7 +91,10 @@ pub fn load_config(mango_config_path: &String) -> anyhow::Result<MangoConfig> {
 }
 
 /// Entrypoint thing
-pub async fn check_health(config: MangoConfig) -> anyhow::Result<()> {
+pub async fn check_health(
+    config: MangoConfig,
+    accounts_sender: tokio::sync::watch::Sender<HashSet<Pubkey>>,
+) -> anyhow::Result<()> {
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
     let mango_group_id = Pubkey::from_str(&config.mango_group_id)?;
     let mango_cache_id = Pubkey::from_str(&config.mango_cache_id)?;
@@ -103,7 +106,7 @@ pub async fn check_health(config: MangoConfig) -> anyhow::Result<()> {
 
     // Information about potentially liquidatable accounts is sent through this
     // channel and then forwarded to all connected websocket clients
-    let liquidation_candidate_sender = websocket_sink::start(config.clone()).await?;
+    // let liquidation_candidate_sender = websocket_sink::start(config.clone()).await?;
 
     // Sourcing account and slot data from solana via websockets
     let (websocket_sender, websocket_receiver) =
@@ -158,7 +161,7 @@ pub async fn check_health(config: MangoConfig) -> anyhow::Result<()> {
                                 if !one_snapshot_done {
                                     continue;
                                 }
-                                if let Err(err) = healthcheck::process_accounts(
+                                if let Err(err) = healthcheck::process_accounts_chan(
                                         &config,
                                         &chain_data,
                                         &mango_group_id,
@@ -189,7 +192,7 @@ pub async fn check_health(config: MangoConfig) -> anyhow::Result<()> {
                                         &chain_data,
                                         &mango_group_id,
                                         &mango_cache_id,
-                                        mango_accounts.iter(),
+                                        mango_accounts,
                                         &mut current_candidates,
                                         &liquidation_candidate_sender,
                                 ) {
