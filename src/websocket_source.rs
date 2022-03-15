@@ -13,7 +13,7 @@ use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig
 use log::*;
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-use crate::{AnyhowWrap, Config};
+use crate::{AnyhowWrap, MangoConfig};
 
 #[derive(Clone)]
 pub struct AccountUpdate {
@@ -44,7 +44,7 @@ pub enum Message {
     Slot(Arc<solana_client::rpc_response::SlotUpdate>),
 }
 
-async fn feed_data(config: &Config, sender: async_channel::Sender<Message>) -> anyhow::Result<()> {
+async fn feed_data(config: &MangoConfig, sender: async_channel::Sender<Message>) -> anyhow::Result<()> {
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
     let serum_program_id = Pubkey::from_str(&config.serum_program_id)?;
     let mango_signer_id = Pubkey::from_str(&config.mango_signer_id)?;
@@ -132,7 +132,7 @@ async fn feed_data(config: &Config, sender: async_channel::Sender<Message>) -> a
     }
 }
 
-pub fn start(config: Config, sender: async_channel::Sender<Message>) {
+pub fn start(config: MangoConfig, sender: async_channel::Sender<Message>) {
     tokio::spawn(async move {
         // if the websocket disconnects, we get no data in a while etc, reconnect and try again
         loop {

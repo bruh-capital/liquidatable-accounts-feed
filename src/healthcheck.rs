@@ -1,5 +1,5 @@
 use {
-    crate::Config,
+    crate::MangoConfig,
     crate::chain_data::ChainData,
     crate::websocket_sink::{LiquidationCanditate, HealthInfo},
     anyhow::Context,
@@ -99,7 +99,7 @@ struct Health {
 }
 
 fn check_health(
-    config: &Config,
+    config: &MangoConfig,
     group: &MangoGroup,
     cache: &MangoCache,
     account: &MangoAccount,
@@ -131,7 +131,7 @@ fn check_health(
 }
 
 pub fn process_accounts<'a>(
-    config: &Config,
+    config: &MangoConfig,
     chain_data: &ChainData,
     group_id: &Pubkey,
     cache_id: &Pubkey,

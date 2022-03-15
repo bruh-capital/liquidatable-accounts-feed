@@ -32,7 +32,7 @@ impl<T, E: std::fmt::Debug> AnyhowWrap for Result<T, E> {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct Config {
+pub struct MangoConfig {
     pub rpc_ws_url: String,
     pub rpc_http_url: String,
     pub mango_program_id: String,
@@ -81,20 +81,21 @@ fn is_mango_cache<'a>(account: &'a AccountSharedData, program_id: &Pubkey) -> bo
     matches!(kind, DataType::MangoCache)
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+pub async fn check_health(config: MangoConfig) -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
         println!("requires a config file argument");
         return Ok(());
     }
 
-    let config: Config = {
+    /* 
+    let config: MangoConfig = {
         let mut file = File::open(&args[1])?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
         toml::from_str(&contents).unwrap()
     };
+    */
 
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
     let mango_group_id = Pubkey::from_str(&config.mango_group_id)?;

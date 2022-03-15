@@ -1,5 +1,5 @@
 use {
-    crate::Config,
+    crate::MangoConfig,
     anyhow::Context,
     futures_util::{SinkExt, StreamExt},
     log::*,
@@ -123,7 +123,7 @@ async fn accept_connection(
     Ok(())
 }
 
-pub async fn start(config: Config) -> anyhow::Result<broadcast::Sender<LiquidationCanditate>> {
+pub async fn start(config: MangoConfig) -> anyhow::Result<broadcast::Sender<LiquidationCanditate>> {
     // The channel that liquidatable event changes are sent through, to
     // be forwarded to websocket clients
     let (tx, _) = broadcast::channel(1000);

@@ -13,7 +13,7 @@ use log::*;
 use std::str::FromStr;
 use tokio::time;
 
-use crate::{AnyhowWrap, Config};
+use crate::{AnyhowWrap, MangoConfig};
 
 #[derive(Clone)]
 pub struct AccountUpdate {
@@ -45,7 +45,7 @@ impl AccountSnapshot {
 }
 
 async fn feed_snapshots(
-    config: &Config,
+    config: &MangoConfig,
     sender: &async_channel::Sender<AccountSnapshot>,
 ) -> anyhow::Result<()> {
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
@@ -120,7 +120,7 @@ async fn feed_snapshots(
     Ok(())
 }
 
-pub fn start(config: Config, sender: async_channel::Sender<AccountSnapshot>) {
+pub fn start(config: MangoConfig, sender: async_channel::Sender<AccountSnapshot>) {
     let mut interval = time::interval(time::Duration::from_secs(config.snapshot_interval_secs));
 
     tokio::spawn(async move {
