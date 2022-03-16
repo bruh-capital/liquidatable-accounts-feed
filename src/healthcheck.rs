@@ -16,6 +16,7 @@ use {
     solana_sdk::account::{AccountSharedData, ReadableAccount},
     solana_sdk::pubkey::Pubkey,
     std::collections::HashSet,
+    std::collections::HashMap,
     std::sync::RwLock,
     tokio::sync::broadcast,
 };
@@ -220,7 +221,7 @@ pub fn process_accounts_chan<'a>(
     group_id: &Pubkey,
     cache_id: &Pubkey,
     accounts: HashSet<Pubkey>,
-    current_candidates: &mut HashSet<LiquidationCanditate>,
+    current_candidates: &mut HashMap<Pubkey, LiquidationCanditate>,
     tx: &tokio::sync::watch::Sender<HashSet<Pubkey>>,
 ) -> anyhow::Result<()> {
     let group =
@@ -267,15 +268,18 @@ pub fn process_accounts_chan<'a>(
             let was_candidate = rwl_candiates
                 .read()
                 .unwrap()
-                .contains(pubkey);
+                .contains_key(pubkey);
 
             if is_candidate && !was_candidate {
                 rwl_candiates
                     .write()
                     .unwrap()
-                    .insert(LiquidationCanditate::Start {
-                        info: health_info.clone(),
-                    });
+                    .insert(
+                        pubkey.clone(),
+                        LiquidationCanditate::Start {
+                            info: health_info.clone(),
+                        }
+                    );
             }
             if !is_candidate && was_candidate {
                 rwl_candiates

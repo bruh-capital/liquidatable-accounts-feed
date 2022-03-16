@@ -7,7 +7,7 @@ pub mod websocket_source;
 
 use {
     crate::chain_data::*,
-    rayon::prelude::*,
+    crate::websocket_sink::LiquidationCanditate,
     log::*,
     mango::state::{DataType, MangoAccount},
     mango_common::Loadable,
@@ -15,6 +15,7 @@ use {
     solana_sdk::account::{AccountSharedData, ReadableAccount},
     solana_sdk::pubkey::Pubkey,
     std::collections::HashSet,
+    std::collections::HashMap,
     std::fs::File,
     std::io::Read,
     std::str::FromStr,
@@ -134,9 +135,8 @@ pub async fn check_health(
     //
     // Used to send a different message for newly liqudatable accounts and
     // accounts that are still liquidatable but not fresh anymore.
-    //
-    // This should actually be done per connected websocket client, and not globally.
-    let mut current_candidates = HashSet::<Pubkey>::new();
+    let mut current_candidates = 
+        HashMap::<Pubkey, LiquidationCanditate>::new();
 
     // Is the first snapshot done? Only start checking account health when it is.
     let mut one_snapshot_done = false;
