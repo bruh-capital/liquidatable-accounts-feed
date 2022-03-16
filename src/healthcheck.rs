@@ -220,7 +220,7 @@ pub fn process_accounts_chan<'a>(
     chain_data: &ChainData,
     group_id: &Pubkey,
     cache_id: &Pubkey,
-    accounts: HashSet<Pubkey>,
+    accounts: &HashSet<Pubkey>,
     current_candidates: &mut HashMap<Pubkey, LiquidationCanditate>,
     tx: &tokio::sync::watch::Sender<HashSet<Pubkey>>,
 ) -> anyhow::Result<()> {

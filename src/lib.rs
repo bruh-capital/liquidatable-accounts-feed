@@ -166,9 +166,9 @@ pub async fn check_health(
                                         &chain_data,
                                         &mango_group_id,
                                         &mango_cache_id,
-                                        std::iter::once(&account_write.pubkey),
+                                        HashSet::from([account_write.pubkey]),
                                         &mut current_candidates,
-                                        &liquidation_candidate_sender,
+                                        &accounts_sender,
                                 ) {
                                     warn!("could not process account {}: {:?}", account_write.pubkey, err);
                                 }
@@ -187,14 +187,14 @@ pub async fn check_health(
                                 //
                                 // However, this currently takes like 50ms for me in release builds,
                                 // so optimizing much seems unnecessary.
-                                if let Err(err) = healthcheck::process_accounts(
+                                if let Err(err) = healthcheck::process_accounts_chan(
                                         &config,
                                         &chain_data,
                                         &mango_group_id,
                                         &mango_cache_id,
-                                        mango_accounts,
+                                        &mango_accounts,
                                         &mut current_candidates,
-                                        &liquidation_candidate_sender,
+                                        &accounts_sender,
                                 ) {
                                     warn!("could not process accounts: {:?}", err);
                                 }
@@ -209,7 +209,7 @@ pub async fn check_health(
                     // Track all mango account pubkeys
                     for update in message.accounts.iter() {
                         if let Some(_mango_account) = is_mango_account(&update.account, &mango_program_id, &mango_group_id) {
-                            mango_accounts.insert(update.pubkey);
+                            &mango_accounts.insert(update.pubkey);
                         }
                     }
 
