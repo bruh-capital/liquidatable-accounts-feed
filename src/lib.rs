@@ -94,7 +94,7 @@ pub fn load_config(mango_config_path: &String) -> anyhow::Result<MangoConfig> {
 /// Entrypoint thing
 pub async fn check_health(
     config: MangoConfig,
-    accounts_sender: tokio::sync::watch::Sender<HashSet<Pubkey>>,
+    accounts_sender: tokio::sync::watch::Sender<HashMap<Pubkey, LiquidationCanditate>>,
 ) -> anyhow::Result<()> {
     let mango_program_id = Pubkey::from_str(&config.mango_program_id)?;
     let mango_group_id = Pubkey::from_str(&config.mango_group_id)?;

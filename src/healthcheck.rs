@@ -222,7 +222,7 @@ pub fn process_accounts_chan<'a>(
     cache_id: &Pubkey,
     accounts: &HashSet<Pubkey>,
     current_candidates: &mut HashMap<Pubkey, LiquidationCanditate>,
-    tx: &tokio::sync::watch::Sender<HashSet<Pubkey>>,
+    tx: &tokio::sync::watch::Sender<HashMap<Pubkey, LiquidationCanditate>>,
 ) -> anyhow::Result<()> {
     let group =
         load_mango_account_from_chain::<MangoGroup>(DataType::MangoGroup, chain_data, group_id)
@@ -232,7 +232,7 @@ pub fn process_accounts_chan<'a>(
             .context("loading cache account")?;
 
     // Put this thing in an RWLock so we can use rayon
-    let rwl_candiates = RwLock::new(current_candidates);
+    let rwl_candidates = RwLock::new(current_candidates);
 
     accounts.par_iter()
         .for_each(|pubkey| {
@@ -265,13 +265,13 @@ pub fn process_accounts_chan<'a>(
 
             // FIXME(Milly): change this to a hashmap
             let is_candidate = info.candidate;
-            let was_candidate = rwl_candiates
+            let was_candidate = rwl_candidates
                 .read()
                 .unwrap()
                 .contains_key(pubkey);
 
             if is_candidate && !was_candidate {
-                rwl_candiates
+                rwl_candidates
                     .write()
                     .unwrap()
                     .insert(
@@ -282,12 +282,16 @@ pub fn process_accounts_chan<'a>(
                     );
             }
             if !is_candidate && was_candidate {
-                rwl_candiates
+                rwl_candidates
                     .write()
                     .unwrap()
                     .remove(pubkey);
             }
         });
+
+    // I would drop the rwl but I complains about types and this works for now...
+    tx.send(rwl_candidates.into_inner().unwrap().clone())
+        .unwrap();
 
     Ok(()) 
 }
