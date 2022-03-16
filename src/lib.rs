@@ -166,7 +166,7 @@ pub async fn check_health(
                                         &chain_data,
                                         &mango_group_id,
                                         &mango_cache_id,
-                                        HashSet::from([account_write.pubkey]),
+                                        &HashSet::from([account_write.pubkey]),
                                         &mut current_candidates,
                                         &accounts_sender,
                                 ) {
@@ -209,7 +209,7 @@ pub async fn check_health(
                     // Track all mango account pubkeys
                     for update in message.accounts.iter() {
                         if let Some(_mango_account) = is_mango_account(&update.account, &mango_program_id, &mango_group_id) {
-                            &mango_accounts.insert(update.pubkey);
+                            mango_accounts.insert(update.pubkey);
                         }
                     }
 
